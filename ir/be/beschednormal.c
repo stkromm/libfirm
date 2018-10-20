@@ -19,6 +19,7 @@
 #include "irgwalk.h"
 #include "irprintf.h"
 #include "irtools.h"
+#include "nodes.h"
 #include "util.h"
 #include <stdlib.h>
 
@@ -223,12 +224,17 @@ static int root_cmp(const void *a, const void *b)
 			ret = (count_result(a1->irn) != 0) - (count_result(b1->irn) != 0);
 			/* compare node idx */
 			if (ret == 0)
-				ret = get_irn_idx(a1->irn) - get_irn_idx(b1->irn);
+				ret = instruction_type_compare(al->irn, bl-irn);
 		}
 	}
 	DB((dbg, LEVEL_1, "root %+F %s %+F\n", a1->irn,
 	    ret < 0 ? "<" : ret > 0 ? ">" : "=", b1->irn));
 	return ret;
+}
+
+static int instruction_type_compare(ir_node *a, ir_node *b)
+{
+	return get_irn_idx(a) - get_irn_idx(b);
 }
 
 static void normal_sched_block(ir_node *block, void *env)
