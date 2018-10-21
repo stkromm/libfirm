@@ -16,10 +16,10 @@
 #include "besched.h"
 #include "debug.h"
 #include "heights.h"
+#include "irnode.h"
 #include "irgwalk.h"
 #include "irprintf.h"
 #include "irtools.h"
-#include "nodes.h"
 #include "util.h"
 #include <stdlib.h>
 
@@ -234,7 +234,46 @@ static int root_cmp(const void *a, const void *b)
 
 static int instruction_type_compare(ir_node *a, ir_node *b)
 {
-	return get_irn_idx(a) - get_irn_idx(b);
+	return get_instruction_latency(b) - get_instruction_latency(a);
+}
+
+static int get_instruction_latency(ir_node *node)
+{
+    /*
+  * 7 Mem
+  * 6 Div float
+  * 5 Div int
+  * 4 Mul float
+  * 3 Mul int
+  * 2 ALU float
+  * 1 ALU int
+  */
+    int ret = 0;
+    ir_op* op_code = get_irn_op(node);
+    ir_mode* mode = get_irn_mode(node);
+
+    if(get_op_Load() == op_code)
+    {
+        ret = 7;
+    }
+    else
+    {
+        int is_float_type = mode == get_modeF() || mode == get_modeD();
+        if(get_op_Div() == op_code)
+        {
+            ret = is_float_type ? 6 : 5;
+        }
+        else if(get_op_Mul() == op_code)
+        {
+            ret = is_float_type ? 4 : 3;
+        }
+        else if(get_op_Add() == op_code || get_op_Mod() == op_code || get_op_Sub() == op_code)
+        {
+            ret = is_float_type ? 2 : 1;
+        }
+    }
+
+    return ret;
 }
 
 static void normal_sched_block(ir_node *block, void *env)
