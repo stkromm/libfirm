@@ -208,35 +208,6 @@ static ir_node **sched_node(ir_node **sched, ir_node *irn)
 	return sched;
 }
 
-static int root_cmp(const void *a, const void *b)
-{
-	const irn_cost_pair *const a1 = (const irn_cost_pair*)a;
-	const irn_cost_pair *const b1 = (const irn_cost_pair*)b;
-	int ret;
-	if (is_cfop(a1->irn) && !is_cfop(b1->irn)) {
-		ret = 1;
-	} else if (is_cfop(b1->irn) && !is_cfop(a1->irn)) {
-		ret = -1;
-	} else {
-		ret = (int)b1->cost - (int)a1->cost;
-		if (ret == 0) {
-			/* place live-out nodes later */
-			ret = (count_result(a1->irn) != 0) - (count_result(b1->irn) != 0);
-			/* compare node idx */
-			if (ret == 0)
-				ret = instruction_type_compare(al->irn, bl-irn);
-		}
-	}
-	DB((dbg, LEVEL_1, "root %+F %s %+F\n", a1->irn,
-	    ret < 0 ? "<" : ret > 0 ? ">" : "=", b1->irn));
-	return ret;
-}
-
-static int instruction_type_compare(ir_node *a, ir_node *b)
-{
-	return get_instruction_latency(b) - get_instruction_latency(a);
-}
-
 static int get_instruction_latency(ir_node *node)
 {
     /*
@@ -276,6 +247,34 @@ static int get_instruction_latency(ir_node *node)
     return ret;
 }
 
+static int instruction_type_compare(ir_node *a, ir_node *b)
+{
+	return get_instruction_latency(b) - get_instruction_latency(a);
+}
+
+static int root_cmp(const void *a, const void *b)
+{
+	const irn_cost_pair *const a1 = (const irn_cost_pair*)a;
+	const irn_cost_pair *const b1 = (const irn_cost_pair*)b;
+	int ret;
+	if (is_cfop(a1->irn) && !is_cfop(b1->irn)) {
+		ret = 1;
+	} else if (is_cfop(b1->irn) && !is_cfop(a1->irn)) {
+		ret = -1;
+	} else {
+		ret = (int)b1->cost - (int)a1->cost;
+		if (ret == 0) {
+			/* place live-out nodes later */
+			ret = (count_result(a1->irn) != 0) - (count_result(b1->irn) != 0);
+			/* compare node idx */
+			if (ret == 0)
+				ret = instruction_type_compare(a1->irn, b1->irn);
+		}
+	}
+	DB((dbg, LEVEL_1, "root %+F %s %+F\n", a1->irn,
+	    ret < 0 ? "<" : ret > 0 ? ">" : "=", b1->irn));
+	return ret;
+}
 static void normal_sched_block(ir_node *block, void *env)
 {
 	ir_node     **roots   = (ir_node**)get_irn_link(block);
