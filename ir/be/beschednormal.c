@@ -252,7 +252,7 @@ static int get_instruction_latency(ir_node *node)
     ir_op* op_code = get_irn_op(node);
     ir_mode* mode = get_irn_mode(node);
 
-    if(get_op_Load() == op_code)
+    if(get_op_Load() == op_code) // TODO Are those all nodes that represent memory ops?
     {
         ret = 7;
     }
@@ -263,11 +263,21 @@ static int get_instruction_latency(ir_node *node)
         {
             ret = is_float_type ? 6 : 5;
         }
-        else if(get_op_Mul() == op_code)
+        else if(get_op_Mul() == op_code || get_op_Mulh() == op_code)
         {
             ret = is_float_type ? 4 : 3;
         }
-        else if(get_op_Add() == op_code || get_op_Mod() == op_code || get_op_Sub() == op_code)
+        else if(get_op_Add() == op_code
+            || get_op_Minus() == op_code
+            || get_op_Sub() == op_code
+            || get_op_Mod() == op_code
+            || get_op_Mux() == op_code
+            || get_op_Not() == op_code
+            || get_op_And() == op_code
+            || get_op_Shl() == op_code
+            || get_op_Shr() == op_code
+            || get_op_Shs() == op_code
+            || get_op_Or() == op_code)
         {
             ret = is_float_type ? 2 : 1;
         }
