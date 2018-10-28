@@ -15,6 +15,11 @@
 #include "firm_types.h"
 #include "be_types.h"
 
+struct instrsched_if_t {
+	unsigned (*get_estimated_cost)(ir_node *node);
+	unsigned (*get_latency)(ir_node *node);
+};
+
 struct regalloc_if_t {
 	unsigned spill_cost;  /**< cost for a spill node */
 	unsigned reload_cost; /**< cost for a reload node */

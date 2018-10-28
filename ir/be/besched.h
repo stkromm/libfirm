@@ -14,6 +14,7 @@
 #include <stdbool.h>
 
 #include "beinfo.h"
+#include "bera.h"
 #include "irdom.h"
 
 static sched_info_t *get_irn_sched_info(const ir_node *node)
@@ -234,7 +235,7 @@ static inline bool value_strictly_dominates(const ir_node *a,
 /**
  * Type for a function scheduling a graph
  */
-typedef void (*schedule_func) (ir_graph *irg);
+typedef void (*schedule_func) (ir_graph *irg, const instrsched_if_t *instrschedif);
 
 /**
  * Register new scheduling algorithm

@@ -475,7 +475,7 @@ bool be_step_first(ir_graph *irg)
 	return true;
 }
 
-void be_step_schedule(ir_graph *irg)
+void be_step_schedule(ir_graph *irg, const instrsched_if_t *instrschedif)
 {
 	/* We generally disable CSE after scheduling as we now may want to duplicate
 	 * operations on purpose, new operations should not merge with existing ones
@@ -483,7 +483,7 @@ void be_step_schedule(ir_graph *irg)
 	set_opt_cse(0);
 
 	be_timer_push(T_SCHED);
-	be_schedule_graph(irg);
+	be_schedule_graph(irg, instrschedif);
 	be_timer_pop(T_SCHED);
 	be_dump(DUMP_SCHED, irg, "sched");
 	be_sched_verify(irg);

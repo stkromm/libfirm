@@ -1381,6 +1381,10 @@ static const regalloc_if_t ia32_regalloc_if = {
 	.perform_memory_operand = ia32_perform_memory_operand,
 };
 
+static const instrsched_if_t ia32_instrsched_if = {
+        .get_latency        = get_ia32_latency,
+};
+
 static bool lower_for_emit(ir_graph *const irg, unsigned *const sp_is_non_ssa)
 {
 	if (!be_step_first(irg))
@@ -1392,7 +1396,7 @@ static bool lower_for_emit(ir_graph *const irg, unsigned *const sp_is_non_ssa)
 	be_birg_from_irg(irg)->non_ssa_regs = sp_is_non_ssa;
 	ia32_select_instructions(irg);
 
-	be_step_schedule(irg);
+	be_step_schedule(irg, &ia32_instrsched_if);
 
 	be_timer_push(T_RA_PREPARATION);
 	ia32_setup_fpu_mode(irg);

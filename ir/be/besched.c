@@ -151,9 +151,9 @@ void be_register_scheduler(const char *name, schedule_func func)
 	be_add_module_to_list(&schedulers, name, (void*)func);
 }
 
-void be_schedule_graph(ir_graph *irg)
+void be_schedule_graph(ir_graph *irg, const instrsched_if_t *instrschedif)
 {
-	scheduler(irg);
+	scheduler(irg, instrschedif);
 }
 
 BE_REGISTER_MODULE_CONSTRUCTOR(be_init_sched)

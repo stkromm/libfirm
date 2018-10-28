@@ -27,6 +27,7 @@ DEBUG_ONLY(static firm_dbg_module_t *dbg = NULL;)
 
 static struct obstack obst;
 static ir_node       *curr_list;
+static const instrsched_if_t *instr_info;
 
 typedef struct irn_cost_pair {
 	ir_node *irn;
@@ -66,11 +67,24 @@ static ir_node *normal_select(ir_nodeset_t *ready_set)
 	return ir_nodeset_first(ready_set);
 }
 
+static int get_instruction_latency(ir_node *node)
+{
+	return instr_info->get_latency(node);
+}
+
+static int instruction_type_compare(ir_node *a, ir_node *b)
+{
+	return get_instruction_latency(b) - get_instruction_latency(a);
+}
+
 static int cost_cmp(const void *a, const void *b)
 {
 	const irn_cost_pair *const a1 = (const irn_cost_pair*)a;
 	const irn_cost_pair *const b1 = (const irn_cost_pair*)b;
 	int ret = (int)b1->cost - (int)a1->cost;
+	if (ret == 0)
+		ret = instruction_type_compare(a1->irn, b1->irn);
+
 	if (ret == 0)
 		ret = (int)get_irn_idx(a1->irn) - (int)get_irn_idx(b1->irn);
 	return ret;
@@ -208,62 +222,6 @@ static ir_node **sched_node(ir_node **sched, ir_node *irn)
 	return sched;
 }
 
-static int get_instruction_latency(ir_node *node)
-{
-    /*
-  * 7 Mem
-  * 6 Div float
-  * 5 Div int
-  * 4 Mul float
-  * 3 Mul int
-  * 2 ALU float
-  * 1 ALU int
-  */
-    int ret = 0;
-    ir_op* op_code = get_irn_op(node);
-    ir_mode* mode = get_irn_mode(node);
-
-    if(mode == mode_M) // TODO Are those all nodes that represent memory ops?
-    {
-        ret = 7;
-    }
-    else
-    {
-        int is_float_type = mode == get_modeF() || mode == get_modeD();
-        ret = is_float_type ? 4 : 1;
-        /*
-        if(get_op_Div() == op_code)
-        {
-            ret = is_float_type ? 6 : 5;
-        }
-        else if(get_op_Mul() == op_code || get_op_Mulh() == op_code)
-        {
-            ret = is_float_type ? 4 : 3;
-        }
-        else if(get_op_Add() == op_code
-            || get_op_Minus() == op_code
-            || get_op_Sub() == op_code
-            || get_op_Mod() == op_code
-            || get_op_Mux() == op_code
-            || get_op_Not() == op_code
-            || get_op_And() == op_code
-            || get_op_Shl() == op_code
-            || get_op_Shr() == op_code
-            || get_op_Shs() == op_code
-            || get_op_Or() == op_code)
-        {
-            ret = is_float_type ? 2 : 1;
-        }*/
-    }
-
-    return ret;
-}
-
-static int instruction_type_compare(ir_node *a, ir_node *b)
-{
-	return get_instruction_latency(b) - get_instruction_latency(a);
-}
-
 static int root_cmp(const void *a, const void *b)
 {
 	const irn_cost_pair *const a1 = (const irn_cost_pair*)a;
@@ -361,8 +319,9 @@ static void real_sched_block(ir_node *block, void *data)
 	be_list_sched_end_block();
 }
 
-static void sched_normal(ir_graph *irg)
+static void sched_normal(ir_graph *irg, const instrsched_if_t *instrschedif)
 {
+	instr_info = instrschedif;
 	/* block uses the link field to store the schedule */
 	ir_reserve_resources(irg, IR_RESOURCE_IRN_LINK);
 
@@ -384,6 +343,7 @@ static void sched_normal(ir_graph *irg)
 
 	ir_free_resources(irg, IR_RESOURCE_IRN_LINK);
 	obstack_free(&obst, NULL);
+	instr_info = NULL;
 }
 
 BE_REGISTER_MODULE_CONSTRUCTOR(be_init_sched_normal)
