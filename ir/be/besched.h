@@ -245,7 +245,7 @@ void be_register_scheduler(const char *name, schedule_func func);
 /**
  * schedule a graph with the currently selected scheduler.
  */
-void be_schedule_graph(ir_graph *irg);
+void be_schedule_graph(ir_graph *irg, const instrsched_if_t *instrschedif);
 
 /**
  * Return the last schedule_first node following node, if there is any, node

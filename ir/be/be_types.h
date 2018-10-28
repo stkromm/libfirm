@@ -58,6 +58,7 @@ typedef struct copy_opt_t      copy_opt_t;
 typedef struct be_main_env_t   be_main_env_t;
 typedef struct be_options_t    be_options_t;
 typedef struct regalloc_if_t   regalloc_if_t;
+typedef struct instrsched_if_t instrsched_if_t;
 
 typedef struct be_register_name_t be_register_name_t;
 

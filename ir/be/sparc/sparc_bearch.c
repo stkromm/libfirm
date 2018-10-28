@@ -450,7 +450,7 @@ static void sparc_generate_code(FILE *output, const char *cup_name)
 		be_birg_from_irg(irg)->non_ssa_regs = sp_is_non_ssa;
 		sparc_select_instructions(irg);
 
-		be_step_schedule(irg);
+		be_step_schedule(irg, NULL);
 
 		be_timer_push(T_RA_PREPARATION);
 		be_sched_fix_flags(irg, &sparc_reg_classes[CLASS_sparc_flags],

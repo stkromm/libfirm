@@ -241,7 +241,7 @@ static void mips_generate_code(FILE *const output, char const *const cup_name)
 		birg->non_ssa_regs = sp_is_non_ssa;
 
 		mips_select_instructions(irg);
-		be_step_schedule(irg);
+		be_step_schedule(irg, NULL);
 		be_step_regalloc(irg, &mips_regalloc_if);
 
 		mips_assign_spill_slots(irg);

@@ -239,7 +239,7 @@ static void riscv_generate_code(FILE *const output, char const *const cup_name)
 		birg->non_ssa_regs = sp_is_non_ssa;
 
 		riscv_select_instructions(irg);
-		be_step_schedule(irg);
+		be_step_schedule(irg, NULL);
 		be_step_regalloc(irg, &riscv_regalloc_if);
 
 		riscv_assign_spill_slots(irg);
