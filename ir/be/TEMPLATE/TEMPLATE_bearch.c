@@ -87,7 +87,7 @@ static void TEMPLATE_generate_code(FILE *output, const char *cup_name)
 		be_birg_from_irg(irg)->non_ssa_regs = sp_is_non_ssa;
 		TEMPLATE_select_instructions(irg);
 
-		be_step_schedule(irg);
+		be_step_schedule(irg, NULL);
 
 		be_step_regalloc(irg, &TEMPLATE_regalloc_if);
 
