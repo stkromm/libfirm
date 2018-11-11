@@ -10,7 +10,6 @@
  */
 #include "array.h"
 #include "belistsched.h"
-#include "ia32_new_nodes.h"
 #include "belive.h"
 #include "bemodule.h"
 #include "benode.h"
@@ -70,7 +69,7 @@ static ir_node *normal_select(ir_nodeset_t *ready_set)
 
 static int get_instruction_latency(ir_node *node)
 {
-	if(!is_ia32_irn(node)) {
+	if(!instr_info->is_defined(node)) {
 		return 0;
 	}
 	return instr_info->get_latency(node);

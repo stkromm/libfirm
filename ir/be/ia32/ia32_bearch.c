@@ -1383,6 +1383,7 @@ static const regalloc_if_t ia32_regalloc_if = {
 
 static const instrsched_if_t ia32_instrsched_if = {
         .get_latency        = get_ia32_latency,
+        .is_defined         = is_ia32_irn,
 };
 
 static bool lower_for_emit(ir_graph *const irg, unsigned *const sp_is_non_ssa)

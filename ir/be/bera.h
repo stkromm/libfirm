@@ -16,7 +16,7 @@
 #include "be_types.h"
 
 struct instrsched_if_t {
-	unsigned (*get_estimated_cost)(ir_node *node);
+	unsigned (*is_defined)(ir_node *node);
 	unsigned (*get_latency)(ir_node *node);
 };
 
