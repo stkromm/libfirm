@@ -87,7 +87,7 @@ static int cost_cmp(const void *a, const void *b)
 	if (ret == 0) {
 		const irn_cost_pair *const a1 = (const irn_cost_pair*)a;
 		const irn_cost_pair *const b1 = (const irn_cost_pair*)b;
-		int ret = (int)b1->cost - (int)a1->cost;
+		ret = (int)b1->cost - (int)a1->cost;
 	}
 	if (ret == 0)
 		ret = (int)get_irn_idx(a1->irn) - (int)get_irn_idx(b1->irn);
