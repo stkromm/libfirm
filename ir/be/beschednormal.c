@@ -131,7 +131,7 @@ static unsigned count_result(const ir_node *irn)
 static void calculate_total_latency(ir_node* irn);
 static unsigned get_max_latency_succ(ir_node* irn)
 {
-		if(is_End(irn)) return;
+		if(is_End(irn)) return 0;
 	DB((dbg, LEVEL_1, "%+F get max latency\n", irn));
 	unsigned max = 0;
 	foreach_irn_out(irn, index, succ) {
@@ -162,7 +162,7 @@ static void calculate_total_latency(ir_node* irn)
 	if (is_End(irn) || is_Bad(irn))
 		return;
 	if (be_is_Keep(irn)) {
-		return 1338;
+		return;
 	}
 	if (is_Pin(irn) || is_Sync(irn) || is_Proj(irn)) { // Proxy latency calculation to projection consumers
 		foreach_irn_out(irn, index, succ) {
