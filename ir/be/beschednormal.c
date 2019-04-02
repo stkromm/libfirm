@@ -96,11 +96,11 @@ static int cost_cmp(const void *a, const void *b)
 	int ret = 0;
 	// Sched by highest minimal path latency
 	if(a2 && b2) {
-	 ret = (int)b2->minimal_path_latency - (int)a2->minimal_path_latency;
+		ret = (int)a1->cost - (int)b1->cost;
 	}
 	// Tie by lowest register costs
 	if (ret == 0) {
-		ret = (int)a1->cost - (int)b1->cost;
+		ret = (int)b2->minimal_path_latency - (int)a2->minimal_path_latency;
 	}
 	// Tie by highest #succ
 	if (ret == 0) {
