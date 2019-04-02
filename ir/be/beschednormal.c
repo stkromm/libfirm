@@ -93,13 +93,11 @@ static int cost_cmp(const void *a, const void *b)
 
 	const flag_and_cost* a2 = get_irn_flag_and_cost(a1->irn);
 	const flag_and_cost* b2 = get_irn_flag_and_cost(b1->irn);
-	int ret = 0;
-	// Sched by highest minimal path latency
-	if(a2 && b2) {
-		ret = (int)a1->cost - (int)b1->cost;
-	}
 	// Tie by lowest register costs
-	if (ret == 0) {
+	int ret = (int)a1->cost - (int)b1->cost;
+
+	// Sched by highest minimal path latency
+	if (ret == 0 && a2 && b2) {
 		ret = (int)b2->minimal_path_latency - (int)a2->minimal_path_latency;
 	}
 	// Tie by highest #succ
