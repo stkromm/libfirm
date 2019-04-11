@@ -80,6 +80,27 @@ static int get_instruction_latency(ir_node *node)
 	return instr_info->get_latency(node);
 }
 
+static unsigned get_maximum_path_latency(ir_node *node) {
+	const flag_and_cost* fc = get_irn_flag_and_cost(node);
+	if (!fc) { // Proxy latency calculation to projection consumers
+		DB((dbg, LEVEL_1, "%+F get max pl\n", node));
+		if (is_Block(node)) return 0;
+		ir_node *block = get_nodes_block(node);
+
+		if (is_Pin(node) || is_Sync(node) || is_Proj(node)) {
+			unsigned max = 0;
+			foreach_irn_out(node, index, succ) {
+				if (is_Block(succ) || get_nodes_block(succ) != block)
+					continue;
+				max = MAX(max, get_maximum_path_latency(succ));
+			}
+			return max;
+		} else {
+			return 0;
+		}
+	}
+	return fc->minimal_path_latency;
+}
 /**
 Sort by
 1. minimal path latency
@@ -91,13 +112,9 @@ static int cost_cmp(const void *a, const void *b)
 	const irn_cost_pair *const a1 = (const irn_cost_pair*)a;
 	const irn_cost_pair *const b1 = (const irn_cost_pair*)b;
 
-	const flag_and_cost* a2 = get_irn_flag_and_cost(a1->irn);
-	const flag_and_cost* b2 = get_irn_flag_and_cost(b1->irn);
 	int ret = 0;
 	// Sched by highest minimal path latency
-	if(a2 && b2) {
-	 ret = (int)b2->minimal_path_latency - (int)a2->minimal_path_latency;
-	}
+	 ret = (int)get_maximum_path_latency(a1->irn) - (int)get_maximum_path_latency(b1->irn);
 	// Tie by lowest register costs
 	if (ret == 0) {
 		ret = (int)a1->cost - (int)b1->cost;
@@ -131,23 +148,19 @@ static unsigned count_result(const ir_node *irn)
 static void calculate_total_latency(ir_node* irn);
 static unsigned get_max_latency_succ(ir_node* irn)
 {
-		if(is_End(irn)) return 0;
+	if(is_End(irn)) return 0;
 	DB((dbg, LEVEL_1, "%+F get max latency\n", irn));
 	unsigned max = 0;
 	foreach_irn_out(irn, index, succ) {
-
-		if (get_irn_mode(succ) != mode_X)
+		ir_node *block = get_nodes_block(irn);
+		if (get_nodes_block(succ) != block || is_End(succ) || is_Bad(succ) || succ == irn)
 			continue;
-		if (is_End(succ) || is_Bad(succ))
-			continue;
-
 		if (is_Pin(succ) || is_Sync(succ) || is_Proj(succ)) {
-			calculate_total_latency(succ);
 			max = MAX(max, get_max_latency_succ(succ));
 		} else {
 			DB((dbg, LEVEL_1, "%+F flag and cost\n", succ));
 			flag_and_cost *fc_succ = get_irn_flag_and_cost(succ);
-			if(fc_succ->minimal_path_latency == 1337) calculate_total_latency(succ);
+			calculate_total_latency(succ);
 			max = MAX(max, fc_succ->minimal_path_latency);
 		}
 	}
@@ -157,26 +170,30 @@ static unsigned get_max_latency_succ(ir_node* irn)
 static void calculate_total_latency(ir_node* irn)
 {
 	DB((dbg, LEVEL_1, "%+F start calculate total latency\n", irn));
-	if (get_irn_mode(irn) != mode_X)
-		return;
-	if (is_End(irn) || is_Bad(irn))
-		return;
-	if (be_is_Keep(irn)) {
+
+	flag_and_cost *fc    = get_irn_flag_and_cost(irn);
+	if (fc && fc->minimal_path_latency != 1337) return;
+
+	if (be_is_Keep(irn) || is_End(irn) || is_Bad(irn))
+	{
+		if (fc) fc->minimal_path_latency = 0;
 		return;
 	}
 	if (is_Pin(irn) || is_Sync(irn) || is_Proj(irn)) { // Proxy latency calculation to projection consumers
 		foreach_irn_out(irn, index, succ) {
+			if (succ == irn) continue;
+			DB((dbg, LEVEL_1, "%+F has succ %+F\n", irn, succ));
 			calculate_total_latency(succ);
 		}
 		return;
 	}
 
-	flag_and_cost *fc    = get_irn_flag_and_cost(irn);
 	if(!fc->no_root) { // Recursion end -> just the instruction latency
 
 		DB((dbg, LEVEL_1, "%+F is root and gets just instr latency\n", irn));
 		fc->minimal_path_latency = get_instruction_latency(irn);
 	} else { // Irn has dependent successors. It's latency is it#s own instruction latency + MAX of successors
+		fc->minimal_path_latency = 0;
 		unsigned max_successor_latency = get_max_latency_succ(irn);
 		DB((dbg, LEVEL_1, "%+F uses own latency %d and max succ %d\n", irn, get_instruction_latency(irn), max_successor_latency));
 		fc->minimal_path_latency = get_instruction_latency(irn) + max_successor_latency;
