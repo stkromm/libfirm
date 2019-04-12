@@ -40,7 +40,7 @@ typedef struct irn_cost_pair {
 
 typedef struct flag_and_cost {
 	bool          no_root;
-	unsigned 			minimal_path_latency;
+	unsigned 			maximum_path_latency;
 	irn_cost_pair costs[];
 } flag_and_cost;
 
@@ -74,20 +74,20 @@ static ir_node *normal_select(ir_nodeset_t *ready_set)
 
 static int get_instruction_latency(ir_node *node)
 {
-	if(!instr_info->is_defined(node)) {
+	if (!instr_info->is_defined(node)) {
 		return 0;
 	}
 	return instr_info->get_latency(node);
 }
 
-static unsigned get_maximum_path_latency(ir_node *node) {
+static unsigned get_maximum_path_latency(ir_node *node)
+{
 	const flag_and_cost* fc = get_irn_flag_and_cost(node);
-	if (!fc) { // Proxy latency calculation to projection consumers
-		DB((dbg, LEVEL_1, "%+F get max pl\n", node));
+	if (!fc) { // For nodes with fc, select the highest mpl of any successor
 		if (is_Block(node)) return 0;
 		ir_node *block = get_nodes_block(node);
 
-		if (is_Pin(node) || is_Sync(node) || is_Proj(node)) {
+		if (is_Pin(node) || is_Sync(node) || is_Proj(node)) { // Forward virtual nodes
 			unsigned max = 0;
 			foreach_irn_out(node, index, succ) {
 				if (is_Block(succ) || get_nodes_block(succ) != block)
@@ -99,33 +99,36 @@ static unsigned get_maximum_path_latency(ir_node *node) {
 			return 0;
 		}
 	}
-	return fc->minimal_path_latency;
+	return fc->maximum_path_latency;
 }
+
 /**
 Sort by
-1. minimal path latency
-2. tree register cost
-3. index
+1. greatest maximum path latency
+2. lowest tree register cost
+3. greatest successor count
+4. lowest index
 */
 static int cost_cmp(const void *a, const void *b)
 {
-	const irn_cost_pair *const a1 = (const irn_cost_pair*)a;
-	const irn_cost_pair *const b1 = (const irn_cost_pair*)b;
+	const irn_cost_pair *const a_fc = (const irn_cost_pair*)a;
+	const irn_cost_pair *const b_fc = (const irn_cost_pair*)b;
 
 	int ret = 0;
-	// Sched by highest minimal path latency
-	 ret = (int)get_maximum_path_latency(a1->irn) - (int)get_maximum_path_latency(b1->irn);
+	// Sched by highest maximum path latency
+	ret = (int)get_maximum_path_latency(a_fc->irn) - (int)get_maximum_path_latency(b_fc->irn);
+
 	// Tie by lowest register costs
 	if (ret == 0) {
-		ret = (int)a1->cost - (int)b1->cost;
+		ret = (int)b_fc->cost - (int)a_fc->cost;
 	}
 	// Tie by highest #succ
 	if (ret == 0) {
-		ret = (int)get_irn_n_outs(b1->irn) - (int)get_irn_n_outs(a1->irn);
+		ret = (int)get_irn_n_outs(a_fc->irn) - (int)get_irn_n_outs(b_fc->irn);
 	}
 	// Tie by index
 	if (ret == 0) {
-		ret = (int)get_irn_idx(a1->irn) - (int)get_irn_idx(b1->irn);
+		ret = (int)get_irn_idx(b_fc->irn) - (int)get_irn_idx(a_fc->irn);
 	}
 	return ret;
 }
@@ -136,11 +139,12 @@ Returns the number of results this node emits
 static unsigned count_result(const ir_node *irn)
 {
 	const ir_mode *mode = get_irn_mode(irn);
-	if (mode == mode_M || mode == mode_X)
+	if (mode == mode_M || mode == mode_X) {
 		return 0;
-	if (mode == mode_T)
+	}
+	if (mode == mode_T) {
 		return 1;
-
+	}
 	arch_register_req_t const *const req = arch_get_irn_register_req(irn);
 	return req->ignore ? 0 : 1;
 }
@@ -148,8 +152,7 @@ static unsigned count_result(const ir_node *irn)
 static void calculate_total_latency(ir_node* irn);
 static unsigned get_max_latency_succ(ir_node* irn)
 {
-	if(is_End(irn)) return 0;
-	DB((dbg, LEVEL_1, "%+F get max latency\n", irn));
+	if (is_End(irn)) return 0;
 	unsigned max = 0;
 	foreach_irn_out(irn, index, succ) {
 		ir_node *block = get_nodes_block(irn);
@@ -158,47 +161,46 @@ static unsigned get_max_latency_succ(ir_node* irn)
 		if (is_Pin(succ) || is_Sync(succ) || is_Proj(succ)) {
 			max = MAX(max, get_max_latency_succ(succ));
 		} else {
-			DB((dbg, LEVEL_1, "%+F flag and cost\n", succ));
 			flag_and_cost *fc_succ = get_irn_flag_and_cost(succ);
 			calculate_total_latency(succ);
-			max = MAX(max, fc_succ->minimal_path_latency);
+			max = MAX(max, fc_succ->maximum_path_latency);
 		}
 	}
 	return max;
 }
 
+/**
+* Expects that flag and cost structure are created
+*/
 static void calculate_total_latency(ir_node* irn)
 {
-	DB((dbg, LEVEL_1, "%+F start calculate total latency\n", irn));
-
 	flag_and_cost *fc    = get_irn_flag_and_cost(irn);
-	if (fc && fc->minimal_path_latency != 1337) return;
+	if (fc && fc->maximum_path_latency != 1337) return;
 
 	if (be_is_Keep(irn) || is_End(irn) || is_Bad(irn))
 	{
-		if (fc) fc->minimal_path_latency = 0;
+		if (fc) fc->maximum_path_latency = 0;
 		return;
 	}
 	if (is_Pin(irn) || is_Sync(irn) || is_Proj(irn)) { // Proxy latency calculation to projection consumers
 		foreach_irn_out(irn, index, succ) {
 			if (succ == irn) continue;
-			DB((dbg, LEVEL_1, "%+F has succ %+F\n", irn, succ));
 			calculate_total_latency(succ);
 		}
 		return;
 	}
 
-	if(!fc->no_root) { // Recursion end -> just the instruction latency
-
+	if (!fc->no_root) { // Recursion end -> just the instruction latency
 		DB((dbg, LEVEL_1, "%+F is root and gets just instr latency\n", irn));
-		fc->minimal_path_latency = get_instruction_latency(irn);
+		fc->maximum_path_latency = get_instruction_latency(irn);
 	} else { // Irn has dependent successors. It's latency is it#s own instruction latency + MAX of successors
-		fc->minimal_path_latency = 0;
+		// set the maximum path latency of this node for now to 0 to break cycles in the graph
+		fc->maximum_path_latency = 0;
 		unsigned max_successor_latency = get_max_latency_succ(irn);
 		DB((dbg, LEVEL_1, "%+F uses own latency %d and max succ %d\n", irn, get_instruction_latency(irn), max_successor_latency));
-		fc->minimal_path_latency = get_instruction_latency(irn) + max_successor_latency;
+		fc->maximum_path_latency = get_instruction_latency(irn) + max_successor_latency;
 	}
-	DB((dbg, LEVEL_1, "%+F end calculate total latency %d\n", irn, fc->minimal_path_latency));
+	DB((dbg, LEVEL_1, "%+F end calculate total latency %d\n", irn, fc->maximum_path_latency));
 }
 
 static unsigned normal_tree_cost(ir_node *irn)
@@ -217,7 +219,7 @@ static unsigned normal_tree_cost(ir_node *irn)
 
 		fc = OALLOCF(&obst, flag_and_cost, costs, arity);
 		fc->no_root = false;
-		fc->minimal_path_latency = 1337;
+		fc->maximum_path_latency = 1337;
 		irn_cost_pair *costs = fc->costs;
 
 		foreach_irn_in(irn, i, pred) {
@@ -242,7 +244,7 @@ static unsigned normal_tree_cost(ir_node *irn)
 				costs[i].cost = cost;
 		}
 
-		// Calculate minimal_path_latency as sum of irn latency and max of all successors
+		// Calculate maximum_path_latency as sum of irn latency and max of all successors
 		QSORT(costs, arity, cost_cmp);
 		set_irn_flag_and_cost(irn, fc);
 	}
@@ -268,16 +270,13 @@ static unsigned normal_tree_cost(ir_node *irn)
 	return MAX(n_res, reg_cost);
 }
 
-static void minimal_path_latency_walker(ir_node *irn, void *data)
+static void maximum_path_latency_walker(ir_node *irn, void *data)
 {
 	(void)data;
-	DB((dbg, LEVEL_1, "minimal path latency walking node %+F\n", irn));
-	if (is_Block(irn)) {
-		return;
+	DB((dbg, LEVEL_1, "maximum path latency walking node %+F\n", irn));
+	if (!is_Block(irn) && !arch_is_irn_not_scheduled(irn)) {
+		calculate_total_latency(irn);
 	}
-	if (arch_is_irn_not_scheduled(irn))
-		return;
-	calculate_total_latency(irn);
 }
 
 static void normal_cost_walker(ir_node *irn, void *data)
@@ -396,6 +395,7 @@ static void normal_sched_block(ir_node *block, void *env)
 	DB((dbg, LEVEL_1, "Scheduling of %+F:\n", block));
 	for (int i = 0, n = ARR_LEN(sched); i < n; ++i) {
 		DB((dbg, LEVEL_1, "  %+F\n", sched[i]));
+		DB((dbg, LEVEL_1, "maximum path latency is %d\n", (int)get_maximum_path_latency(sched[i])));
 	}
 	DB((dbg, LEVEL_1, "\n"));
 #endif
@@ -441,7 +441,7 @@ static void sched_normal(ir_graph *irg, const instrsched_if_t *instrsched)
 	/* Prepare scheduling */
 	/* Calculates is_root flag and tree costs of each to be scheduled node */
 	irg_walk_graph(irg, normal_cost_walker,  NULL, NULL);
-	irg_walk_graph(irg, minimal_path_latency_walker,  NULL, NULL);
+	irg_walk_graph(irg, maximum_path_latency_walker,  NULL, NULL);
 	/* Creates a list of all roots (= initial ready set)*/
 	irg_walk_graph(irg, collect_roots, NULL, NULL);
 	{
