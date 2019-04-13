@@ -105,9 +105,7 @@ static unsigned get_maximum_path_latency(ir_node *node)
 /**
 Sort by
 1. greatest maximum path latency
-2. greatest successor count
-3. lowest tree register cost
-4. lowest index
+2. lowest index
 */
 static int cost_cmp(const void *a, const void *b)
 {
@@ -115,17 +113,9 @@ static int cost_cmp(const void *a, const void *b)
 	const irn_cost_pair *const b_fc = (const irn_cost_pair*)b;
 
 	int ret = 0;
-	// Sched by lowest register costs
-	ret = (int)b_fc->cost - (int)a_fc->cost;
 
-	// Tie by highest maximum path latency
-	if (ret == 0) {
-		ret = (int)get_maximum_path_latency(a_fc->irn) - (int)get_maximum_path_latency(b_fc->irn);
-	}
-	// Tie by highest #succ
-	if (ret == 0) {
-		ret = (int)get_irn_n_outs(a_fc->irn) - (int)get_irn_n_outs(b_fc->irn);
-	}
+	ret = (int)get_maximum_path_latency(a_fc->irn) - (int)get_maximum_path_latency(b_fc->irn);
+
 	// Tie by index
 	if (ret == 0) {
 		ret = (int)get_irn_idx(b_fc->irn) - (int)get_irn_idx(a_fc->irn);
